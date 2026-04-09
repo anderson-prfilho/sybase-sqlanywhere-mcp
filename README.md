@@ -16,10 +16,23 @@ Based on [CData's MCP server framework](https://github.com/cdatasoftware/sap-syb
 - **Java 17+** (for building and running)
 - **jConnect JDBC driver** (`jconn4.jar`) — included with SQL Anywhere installations, or available from DBeaver's driver cache
 
-## Building
+## Quick Start (Download)
+
+1. Download the pre-built JAR:
+   ```bash
+   curl -L -o sybase-mcp-server.jar \
+     https://github.com/edurbs/sybase-sqlanywhere-mcp/releases/download/v1.0.0/sybase-mcp-server-jar-with-dependencies.jar
+   ```
+2. Get `jconn4.jar` (see [Getting jConnect](#getting-jconnect) below)
+3. Create a `.prp` file (see [Configuration](#configuration))
+4. Run it — see [Usage with Claude Code](#usage-with-claude-code) or [Usage with Claude Desktop](#usage-with-claude-desktop)
+
+## Building from Source
+
+If you prefer to build from source, or want to modify the server:
 
 ```bash
-git clone https://github.com/eduardo/sybase-sqlanywhere-mcp.git
+git clone https://github.com/edurbs/sybase-sqlanywhere-mcp.git
 cd sybase-sqlanywhere-mcp
 mvn clean package
 ```
