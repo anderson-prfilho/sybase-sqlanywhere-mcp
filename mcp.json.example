@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "sybase": {
+      "type": "stdio",
+      "command": "java",
+      "args": [
+        "-jar",
+        "/path/to/sybase-mcp-server-jar-with-dependencies.jar",
+        "/path/to/sqlanywhere.prp"
+      ]
+    }
+  }
+}
