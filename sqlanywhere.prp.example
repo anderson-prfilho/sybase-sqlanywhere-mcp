@@ -1,0 +1,5 @@
+Prefix=sybase
+DriverPath=/path/to/jconn4.jar
+DriverClass=com.sybase.jdbc4.jdbc.SybDriver
+JdbcUrl=jdbc:sybase:Tds=HOST:PORT/DATABASE?user=USERNAME&password=PASSWORD
+Tables=
