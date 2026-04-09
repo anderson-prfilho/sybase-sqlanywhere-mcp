@@ -23,7 +23,7 @@ Based on [CData's MCP server framework](https://github.com/cdatasoftware/sap-syb
    curl -L -o sybase-mcp-server.jar \
      https://github.com/edurbs/sybase-sqlanywhere-mcp/releases/download/v1.0.0/sybase-mcp-server-jar-with-dependencies.jar
    ```
-2. Get `jconn4.jar` (see [Getting jConnect](#getting-jconnect) below)
+2. Download jConnect: [jconn4.jar](https://dbeaver.io/files/jdbc/drivers/sybase/jconnect/jconn4.jar) ([license](https://dbeaver.io/files/jdbc/drivers/sybase/jconnect/LICENSE.txt))
 3. Create a `.prp` file (see [Configuration](#configuration))
 4. Run it — see [Usage with Claude Code](#usage-with-claude-code) or [Usage with Claude Desktop](#usage-with-claude-desktop)
 
@@ -55,8 +55,10 @@ Tables=
 
 ### Getting jConnect
 
+- From DBeaver's hosted copy: [jconn4.jar](https://dbeaver.io/files/jdbc/drivers/sybase/jconnect/jconn4.jar) (jConnect 16.0 SP03 PL02)
+- [jConnect License](https://dbeaver.io/files/jdbc/drivers/sybase/jconnect/LICENSE.txt) (proprietary — use restricted to Sybase ASE interoperability)
 - From a SQL Anywhere installation: `Bin64/jconn4.jar`
-- From DBeaver's driver cache: `~/.local/share/DBeaverData/drivers/drivers/sybase/jconnect/jconn4.jar`
+- From DBeaver's local driver cache: `~/.local/share/DBeaverData/drivers/drivers/sybase/jconnect/jconn4.jar`
 
 ## Usage with Claude Code
 
