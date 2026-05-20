@@ -1,5 +1,50 @@
+# Prefix that will be used in front of every tool/resource name (e.g. sybase_get_tables).
 Prefix=sybase
-DriverPath=/path/to/jconn4.jar
-DriverClass=com.sybase.jdbc4.jdbc.SybDriver
-JdbcUrl=jdbc:sybase:Tds=HOST:PORT/DATABASE?user=USERNAME&password=PASSWORD
+
+# JDBC driver class and JAR.
+#
+# Option A - Native SAP SQL Anywhere driver (recommended on Windows when you have
+# SQL Anywhere 16 installed locally). The native driver uses JNI and requires the
+# Bin64 folder to be on the PATH (the SQL Anywhere installer does this by default).
+DriverPath=C:\\Program Files\\SQL Anywhere 16\\Java\\sajdbc4.jar
+DriverClass=sybase.jdbc4.sqlanywhere.IDriver
+JdbcUrl=jdbc:sqlanywhere:links=tcpip(host=HOST);ServerName=SERVER;port=PORT;DatabaseName=DB
+
+# Option B - Pure-Java jConnect driver (no native dependency, works on any OS):
+# DriverPath=/path/to/jconn4.jar
+# DriverClass=com.sybase.jdbc4.jdbc.SybDriver
+# JdbcUrl=jdbc:sybase:Tds=HOST:PORT/DATABASE
+
+# Credentials. You can also embed them in JdbcUrl (UID/PWD or user/password),
+# but keeping them here lets the server mask the password in logs.
+User=externo
+Password=changeme
+
+# === Security / governance ===
+# When ReadOnly=true, only SELECT/WITH/EXPLAIN/DESCRIBE are accepted by run_query.
+# This is the default and recommended for agent use.
+ReadOnly=true
+
+# Enables the sybase_execute tool (INSERT/UPDATE/DELETE/DDL). Off by default.
+# Even when on, every call requires confirm=true to actually run.
+AllowWrite=false
+
+# Caps every query and result that flows through the server.
+MaxRows=1000
+QueryTimeoutSeconds=30
+
+# Default output format for tabular tools. Can always be overridden per-call.
+# Accepted: csv | json | markdown
+DefaultFormat=csv
+
+# Schemas the agent is allowed to see/query. Comma-separated, case-insensitive.
+# Leave AllowSchemas empty to allow all (except those in BlockSchemas).
+# AllowSchemas=externo,contabil
+BlockSchemas=SYS,DBO,RS_SYSTABGROUP,PUBLIC
+
+# Optional list of tables to expose as MCP resources (browseable from the client).
+# Format: catalog.schema.table or schema.table or table, comma-separated.
 Tables=
+
+# Optional log file. If unset, logs go to stderr.
+LogFile=

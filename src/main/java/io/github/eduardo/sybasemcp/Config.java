@@ -11,8 +11,13 @@ import java.sql.Driver;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Properties;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import static io.github.eduardo.sybasemcp.StringUtil.isNullOrEmpty;
 
@@ -24,7 +29,22 @@ public class Config {
   private static final String TABLES = "Tables";
   private static final String LOG_FILE = "LogFile";
 
-  // following properties will be discovered dynamically from driver
+  private static final String USER = "User";
+  private static final String PASSWORD = "Password";
+  private static final String READ_ONLY = "ReadOnly";
+  private static final String ALLOW_WRITE = "AllowWrite";
+  private static final String MAX_ROWS = "MaxRows";
+  private static final String QUERY_TIMEOUT_SECONDS = "QueryTimeoutSeconds";
+  private static final String ALLOW_SCHEMAS = "AllowSchemas";
+  private static final String BLOCK_SCHEMAS = "BlockSchemas";
+  private static final String DEFAULT_FORMAT = "DefaultFormat";
+
+  private static final int DEFAULT_MAX_ROWS = 1000;
+  private static final int DEFAULT_QUERY_TIMEOUT_SECONDS = 30;
+  private static final Set<String> DEFAULT_BLOCK_SCHEMAS = new HashSet<>(Arrays.asList(
+      "SYS", "DBO", "RS_SYSTABGROUP", "PUBLIC"
+  ));
+
   private static final String ID_QUOTE_OPEN_CHAR = "IDENTIFIER_QUOTE_OPEN_CHAR";
   private static final String ID_QUOTE_CLOSE_CHAR = "IDENTIFIER_QUOTE_CLOSE_CHAR";
   private static final String SUPPORTS_MULTIPLE_CATALOGS = "SUPPORTS_MULTIPLE_CATALOGS";
@@ -73,7 +93,7 @@ public class Config {
     return this.getPrefix();
   }
   public String getServerVersion() {
-    return "1.0";
+    return "2.0";
   }
   public String getPrefix() {
     return this.props.getProperty(PREFIX);
@@ -90,6 +110,40 @@ public class Config {
   public String getJdbcUrl() {
     return this.props.getProperty(JDBC_URL);
   }
+  public String getUser() {
+    return this.props.getProperty(USER);
+  }
+  public String getPassword() {
+    return this.props.getProperty(PASSWORD);
+  }
+  public boolean isReadOnly() {
+    return parseBoolean(this.props.getProperty(READ_ONLY), true);
+  }
+  public boolean isWriteAllowed() {
+    return parseBoolean(this.props.getProperty(ALLOW_WRITE), false);
+  }
+  public int getMaxRows() {
+    return parseInt(this.props.getProperty(MAX_ROWS), DEFAULT_MAX_ROWS);
+  }
+  public int getQueryTimeoutSeconds() {
+    return parseInt(this.props.getProperty(QUERY_TIMEOUT_SECONDS), DEFAULT_QUERY_TIMEOUT_SECONDS);
+  }
+  public Format getDefaultFormat() {
+    return Format.parse(this.props.getProperty(DEFAULT_FORMAT), Format.CSV);
+  }
+
+  public Set<String> getAllowSchemas() {
+    return parseCsvSet(this.props.getProperty(ALLOW_SCHEMAS));
+  }
+
+  public Set<String> getBlockSchemas() {
+    Set<String> configured = parseCsvSet(this.props.getProperty(BLOCK_SCHEMAS));
+    if (configured.isEmpty()) {
+      return new HashSet<>(DEFAULT_BLOCK_SCHEMAS);
+    }
+    return configured;
+  }
+
   public List<Table> getTables() throws SQLException {
     String tables = this.props.getProperty(TABLES);
     if (isNullOrEmpty(tables)) {
@@ -124,12 +178,36 @@ public class Config {
   public String quoteIdentifier(String id) {
     String open = this.sqlInfo.getProperty(ID_QUOTE_OPEN_CHAR);
     String close = this.sqlInfo.getProperty(ID_QUOTE_CLOSE_CHAR);
-    // TODO: Properly escape things
-    return open + id + close;
+    return open + id.replace(close, close + close) + close;
   }
 
   public Connection newConnection() throws SQLException {
-    return this.driver.connect(this.getJdbcUrl(), new Properties());
+    Properties connProps = new Properties();
+    if (!isNullOrEmpty(getUser())) {
+      connProps.setProperty("user", getUser());
+    }
+    if (!isNullOrEmpty(getPassword())) {
+      connProps.setProperty("password", getPassword());
+    }
+    Connection cn = this.driver.connect(this.getJdbcUrl(), connProps);
+    if (cn == null) {
+      throw new SQLException("JDBC driver returned null connection - check JdbcUrl/credentials");
+    }
+    return cn;
+  }
+
+  /**
+   * Opens a connection with the appropriate readonly flag for the requested mode.
+   * @param write true when the caller is going to run a write statement
+   */
+  public Connection newConnection(boolean write) throws SQLException {
+    Connection cn = newConnection();
+    try {
+      cn.setReadOnly(!write && isReadOnly());
+    } catch (SQLException ignored) {
+      // some drivers refuse setReadOnly; keep going
+    }
+    return cn;
   }
 
   private boolean verifyDriverLoad(PrintStream errors) {
@@ -153,7 +231,7 @@ public class Config {
       }
       return true;
     } catch ( SQLException ex ) {
-      errors.println("Failed to open JDBC connection: " + ex.getMessage());
+      errors.println("Failed to open JDBC connection: " + PasswordMasker.maskMessage(ex.getMessage()));
     }
     return false;
   }
@@ -222,7 +300,6 @@ public class Config {
     List<Table> result = new ArrayList<>();
     try (Connection cn = newConnection()) {
       DatabaseMetaData meta = cn.getMetaData();
-      // Not the most efficient, but oh well
       for (Table t : list) {
         addMatchingTables(t, meta, result);
       }
@@ -242,5 +319,35 @@ public class Config {
         result.add(new Table(catalog, schema, name));
       }
     }
+  }
+
+  private static boolean parseBoolean(String value, boolean defaultValue) {
+    if (isNullOrEmpty(value)) {
+      return defaultValue;
+    }
+    String v = value.trim().toLowerCase();
+    return v.equals("true") || v.equals("1") || v.equals("yes") || v.equals("on");
+  }
+
+  private static int parseInt(String value, int defaultValue) {
+    if (isNullOrEmpty(value)) {
+      return defaultValue;
+    }
+    try {
+      return Integer.parseInt(value.trim());
+    } catch (NumberFormatException e) {
+      return defaultValue;
+    }
+  }
+
+  private static Set<String> parseCsvSet(String csv) {
+    if (isNullOrEmpty(csv)) {
+      return Collections.emptySet();
+    }
+    return Arrays.stream(csv.split(","))
+        .map(String::trim)
+        .filter(s -> !s.isEmpty())
+        .map(String::toUpperCase)
+        .collect(Collectors.toCollection(HashSet::new));
   }
 }

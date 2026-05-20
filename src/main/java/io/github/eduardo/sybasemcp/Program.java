@@ -1,12 +1,11 @@
 package io.github.eduardo.sybasemcp;
 
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
 
 import io.github.eduardo.sybasemcp.resources.TableMetadataResource;
-import io.github.eduardo.sybasemcp.tools.GetColumnsTool;
-import io.github.eduardo.sybasemcp.tools.GetTablesTool;
-import io.github.eduardo.sybasemcp.tools.RunQueryTool;
+import io.github.eduardo.sybasemcp.tools.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.modelcontextprotocol.server.McpServer;
@@ -16,7 +15,7 @@ import io.modelcontextprotocol.spec.McpSchema;
 import io.modelcontextprotocol.spec.ServerMcpTransport;
 
 public class Program {
-  
+
   private ServerMcpTransport transport;
   private Config config;
   private McpSyncServer mcpServer;
@@ -26,8 +25,11 @@ public class Program {
     this.config = new Config();
     this.config.load(configPath);
     if (!StringUtil.isNullOrEmpty(this.config.getLogFile())) {
-      System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "debug");
+      System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "info");
       System.setProperty("org.slf4j.simpleLogger.logFile", this.config.getLogFile());
+      System.setProperty("org.slf4j.simpleLogger.showDateTime", "true");
+      System.setProperty("org.slf4j.simpleLogger.dateTimeFormat", "yyyy-MM-dd HH:mm:ss.SSS");
+      System.setProperty("org.slf4j.simpleLogger.showThreadName", "false");
     }
     if (!this.config.validate(System.err)) {
       System.exit(-1);
@@ -44,7 +46,6 @@ public class Program {
                 McpSchema.ServerCapabilities.builder()
                     .tools(true)
                     .resources(false, true)
-                    //.logging()
                     .build()
             );
 
@@ -59,13 +60,12 @@ public class Program {
       System.err.println("Usage: <properties-file-path>");
       System.exit(-1);
     }
-    String path = args[0];
 
     final Program p = new Program();
     p.init(args[0]);
     p.configureMcp();
     if (!STDIO) {
-      //p.runHttpServer();
+      // p.runHttpServer();
     } else {
       Runtime.getRuntime().addShutdownHook(new Thread() {
         public void run() {
@@ -83,22 +83,51 @@ public class Program {
 
   private static void registerResources(Config config, McpServer.SyncSpec mcp) throws SQLException {
     List<Table> tables = config.getTables();
+    if (tables.isEmpty()) return;
     TableMetadataResource resource = new TableMetadataResource(config);
 
     for (Table r : tables) {
       resource.register(mcp, r);
     }
   }
+
   private static void registerTools(Config config, McpServer.SyncSpec mcp) throws Exception {
-    ITool[] tools = new ITool[] {
-        new GetTablesTool(config),
-        new GetColumnsTool(config),
-        new RunQueryTool(config)
-    };
+    List<ITool> tools = buildToolList(config);
     for (ITool tool : tools) {
       if (tool != null) {
         tool.register(mcp);
       }
     }
+  }
+
+  public static List<ITool> buildToolList(Config config) {
+    List<ITool> tools = new ArrayList<>();
+    tools.add(new PingTool(config));
+    tools.add(new DatabaseInfoTool(config));
+    tools.add(new ListSchemasTool(config));
+    tools.add(new GetTablesTool(config));
+    tools.add(new GetColumnsTool(config));
+    tools.add(new GetTableInfoTool(config));
+    tools.add(new GetPrimaryKeysTool(config));
+    tools.add(new GetForeignKeysTool(config));
+    tools.add(new GetIndexesTool(config));
+    tools.add(new GetTablePermissionsTool(config));
+    tools.add(new GetProceduresTool(config));
+    tools.add(new GetProcedureDefinitionTool(config));
+    tools.add(new GetViewDefinitionTool(config));
+    tools.add(new SearchObjectsTool(config));
+    tools.add(new SampleRowsTool(config));
+    tools.add(new CountRowsTool(config));
+    tools.add(new GetColumnStatsTool(config));
+    tools.add(new GetValueDistributionTool(config));
+    tools.add(new DescribeQueryTool(config));
+    tools.add(new ExplainPlanTool(config));
+    tools.add(new RunScalarTool(config));
+    tools.add(new RunQueryTool(config));
+
+    if (config.isWriteAllowed()) {
+      tools.add(new ExecuteTool(config));
+    }
+    return tools;
   }
 }

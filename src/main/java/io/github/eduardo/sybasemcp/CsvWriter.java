@@ -1,6 +1,7 @@
 package io.github.eduardo.sybasemcp;
 
 public class CsvWriter {
+  private static final String NULL_TOKEN = "";
   private StringBuilder buffer = new StringBuilder();
 
   public Row row() {
@@ -13,24 +14,28 @@ public class CsvWriter {
 
   public class Row {
     private StringBuilder row = new StringBuilder();
+    private int columnCount = 0;
 
     public Row column(String value) {
-      if (row.length() > 0) {
+      if (columnCount > 0) {
         row.append(',');
       }
-      if (value != null && value.length() > 0) {
+      columnCount++;
+      if (value == null) {
+        row.append(NULL_TOKEN);
+      } else {
         quote(value);
       }
       return this;
     }
 
     public void end() {
-      buffer.append(this.row)
-          .append("\n");
+      buffer.append(this.row).append("\n");
     }
+
     private void quote(String val) {
       row.append('"');
-      for (int i=0; i < val.length(); i++) {
+      for (int i = 0; i < val.length(); i++) {
         char ch = val.charAt(i);
         if (ch == '"') {
           row.append(ch);
