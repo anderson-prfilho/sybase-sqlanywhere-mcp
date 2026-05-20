@@ -1,75 +1,81 @@
-# Sybase SQL Anywhere MCP Server
+# Servidor MCP Sybase SQL Anywhere
 
-An open-source Model Context Protocol (MCP) server for SAP SQL Anywhere. The
-server is JDBC-driver-agnostic - it loads whichever driver you point it at via
-the `.prp` file - so it works equally well with:
+Servidor [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) open source para **SAP SQL Anywhere**, pensado para uso com agentes de IA (Cursor, Claude Desktop, Claude Code e similares).
 
-- the **native SAP SQL Anywhere driver** (`sajdbc4.jar`, recommended on Windows
-  when you already have SQL Anywhere installed), or
-- the **pure-Java jConnect driver** (`jconn4.jar`, no native dependencies).
+O servidor é **agnóstico ao driver JDBC**: você aponta o `.jar` e a classe no arquivo `.prp`, sem recompilar. Funciona com:
 
-Originally based on [CData's MCP server framework](https://github.com/cdatasoftware/sap-sybase-mcp-server-by-cdata) (MIT license).
+- **Driver nativo SAP** (`sajdbc4.jar`) — recomendado no Windows quando o SQL Anywhere já está instalado; suporte validado até **SAP SQL Anywhere 17** com `sajdbc4`;
+- **Driver jConnect** (`jconn4.jar`) — Java puro, sem dependências nativas.
 
-## What's new
+Baseado originalmente no [framework MCP da CData](https://github.com/cdatasoftware/sap-sybase-mcp-server-by-cdata) (licença MIT) e no repositório [edurbs/sybase-sqlanywhere-mcp](https://github.com/edurbs/sybase-sqlanywhere-mcp).
 
-- **2.1**: 7 more tools (`ping`, `list_schemas`, `describe_query`, `run_scalar`,
-  `get_column_stats`, `get_value_distribution`, `get_table_permissions`),
-  bind-parameter support in `run_query`/`execute`, full compatibility with SAP
-  SQL Anywhere 17, and a Java test harness that exercises every tool against a
-  live database. Validated end-to-end with **24/24 PASS**.
-- **2.0**: 13 new tools, read-only mode by default, opt-in DML/DDL, schema
-  allow/block lists, CSV/JSON/Markdown output, structured response metadata,
-  masked password logs, prepared statements everywhere.
+## Sobre este fork
 
-See [CHANGELOG.md](./CHANGELOG.md) for the full list.
+Este repositório ([anderson-prfilho/sybase-sqlanywhere-mcp](https://github.com/anderson-prfilho/sybase-sqlanywhere-mcp)) expande o upstream, que expunha basicamente `get_tables`, `get_columns` e `run_query`, para um **MCP completo e seguro para bases SAP em produção**.
 
-## Features
+As mudanças principais (releases **2.0** e **2.1**) foram desenvolvidas para cenários reais com **SQL Anywhere 17** e driver nativo `sajdbc4`, onde o agente precisa:
 
-- Connects to SQL Anywhere through any JDBC driver - swap drivers without
-  recompiling.
-- **23 tools** covering schema discovery, relationships, source code of
-  procedures/views, sampling, counting, profiling, permissions, query plans,
-  and ad-hoc SELECT (parameterized).
-- **Read-only by default.** A separate `sybase_execute` tool is registered
-  only when `AllowWrite=true`, and each call requires explicit `confirm=true`.
-- Output in **CSV, JSON or Markdown**, with a metadata envelope (rowCount,
-  truncated, elapsedMs, column types).
-- **Allow/block schema lists** so the agent stays inside the data you want it
-  to see.
-- Server-side **row cap** and **query timeout** keep accidental
-  `SELECT *` from melting your database or context window.
-- **Prepared statements** for every metadata query (no string concat).
-- Passwords are **masked in logs** and in JDBC error messages.
+- explorar catálogo, relacionamentos, procedures, views e permissões sem adivinhar o schema;
+- perfilar colunas (cardinalidade, nulos, distribuição de valores) antes de montar JOINs;
+- executar consultas com **parâmetros vinculados**, limites de linhas e timeout;
+- operar em **modo somente leitura** por padrão, com DML/DDL apenas sob opt-in explícito.
 
-## Prerequisites
+O harness `TestAllTools` valida as **23 ferramentas** contra um banco vivo (resultado documentado: **24/24 PASS**).
 
-- Java 17+ (build and runtime)
-- One of:
-  - SAP SQL Anywhere 16+ installed (provides `Java\sajdbc4.jar` and the native
-    `dbjdbc16.dll`). The installer adds `Bin64` to the system `PATH`; if you
-    moved the installation, add it manually or pass
-    `-Djava.library.path="<path-to-Bin64>"` in the `java` command, OR
-  - The jConnect JAR (`jconn4.jar`) - works without any native libraries.
+Detalhes completos em [CHANGELOG.md](./CHANGELOG.md).
 
-## Quick start
+## Novidades
 
-### 1. Build (or download)
+### 2.1
 
-Build locally:
+- **7 ferramentas novas:** `ping`, `list_schemas`, `describe_query`, `run_scalar`, `get_column_stats`, `get_value_distribution`, `get_table_permissions`;
+- **Parâmetros vinculados** em `run_query` e `execute` (array `params` → `PreparedStatement` com `?`);
+- **Compatibilidade SAP SQL Anywhere 17** (catálogos `SYS` ajustados onde colunas como `proc_type` ou `role` não existem);
+- **Harness de testes** `TestAllTools` — exercita cada tool com schema/tabela/coluna descobertos automaticamente no banco.
+
+### 2.0
+
+- **13 ferramentas novas** de descoberta, amostragem, plano de execução e escrita opt-in;
+- Modo **somente leitura** por padrão; `execute` só com `AllowWrite=true` + `confirm=true` por chamada;
+- Listas **allow/block** de schemas; saídas **CSV, JSON e Markdown** com envelope de metadados;
+- Senhas **mascaradas** em logs e erros JDBC; **prepared statements** em consultas de metadados.
+
+## Recursos
+
+- Conexão via qualquer driver JDBC configurado no `.prp` — troca de driver sem recompilar.
+- **23 ferramentas** cobrindo catálogo, relacionamentos, código-fonte de procedures/views, amostragem, contagem, profiling, permissões, planos de execução e `SELECT` ad hoc (com bind params).
+- **Somente leitura por padrão.** A tool `sybase_execute` só é registrada com `AllowWrite=true`, e cada chamada exige `confirm=true`.
+- Saída em **CSV, JSON ou Markdown**, com envelope `// meta: {...}` (`rowCount`, `truncated`, `elapsedMs`, tipos das colunas).
+- Listas **AllowSchemas / BlockSchemas** para manter o agente nos schemas de negócio.
+- **Teto de linhas** (`MaxRows`) e **timeout** (`QueryTimeoutSeconds`) no servidor — protegem o banco e a janela de contexto do LLM.
+- **Prepared statements** nas consultas de metadados e suporte a `params` em `run_query`/`execute`.
+- Senhas **mascaradas** em logs e mensagens de erro JDBC.
+
+## Pré-requisitos
+
+- **Java 17+** (build e runtime)
+- Um dos drivers:
+  - SAP SQL Anywhere **16+** instalado (fornece `Java\sajdbc4.jar` e `dbjdbc16.dll`). O instalador costuma colocar `Bin64` no `PATH`; se mudou o diretório de instalação, adicione manualmente ou use `-Djava.library.path="<caminho-Bin64>"` no comando `java`, **ou**
+  - JAR jConnect (`jconn4.jar`) — sem bibliotecas nativas.
+
+## Início rápido
+
+### 1. Build (ou download)
+
+Build local a partir deste fork:
 
 ```bash
-git clone https://github.com/edurbs/sybase-sqlanywhere-mcp.git
+git clone https://github.com/anderson-prfilho/sybase-sqlanywhere-mcp.git
 cd sybase-sqlanywhere-mcp
 mvn clean package -DskipTests
-# produces target/sybase-mcp-server-jar-with-dependencies.jar
+# gera target/sybase-mcp-server-jar-with-dependencies.jar
 ```
 
-Or grab the pre-built JAR from the GitHub releases of the upstream project.
+Também é possível usar releases/JAR do [upstream](https://github.com/edurbs/sybase-sqlanywhere-mcp), mas as ferramentas e correções descritas aqui estão neste fork.
 
-### 2. Create the `.prp`
+### 2. Criar o `.prp`
 
-Copy `sqlanywhere.prp.example` to `sqlanywhere.prp` and edit. Minimum example
-using the native driver on Windows:
+Copie `sqlanywhere.prp.example` para `sqlanywhere.prp` e edite. Exemplo mínimo com driver nativo no Windows:
 
 ```properties
 Prefix=sybase
@@ -81,12 +87,11 @@ Password=mypass
 ReadOnly=true
 ```
 
-The `.prp` file is gitignored. See [Configuration options](#configuration-options)
-for the full list.
+O arquivo `.prp` está no `.gitignore` (não versione credenciais). Veja [Opções de configuração](#opções-de-configuração).
 
-### 3. Register with your MCP client
+### 3. Registrar no cliente MCP
 
-Cursor / Claude Code (`~/.cursor/mcp.json` or `.mcp.json` in your project):
+Cursor / Claude Code (`~/.cursor/mcp.json` ou `.mcp.json` no projeto):
 
 ```json
 {
@@ -96,150 +101,140 @@ Cursor / Claude Code (`~/.cursor/mcp.json` or `.mcp.json` in your project):
       "command": "java",
       "args": [
         "-jar",
-        "C:\\path\\to\\sybase-mcp-server-jar-with-dependencies.jar",
-        "C:\\path\\to\\sqlanywhere.prp"
+        "C:\\caminho\\para\\sybase-mcp-server-jar-with-dependencies.jar",
+        "C:\\caminho\\para\\sqlanywhere.prp"
       ]
     }
   }
 }
 ```
 
-Claude Desktop (`claude_desktop_config.json`): drop the `"type": "stdio"`,
-otherwise identical.
+Claude Desktop (`claude_desktop_config.json`): remova `"type": "stdio"`; o restante é igual.
 
-## Available tools
+Exemplo completo: [mcp.json.example](./mcp.json.example).
 
-All tool names are prefixed with the `Prefix` from your `.prp`
-(default `sybase`). Replace `sybase` below with your prefix if different.
+## Ferramentas disponíveis
 
-| Tool | Purpose |
+Todos os nomes são prefixados pelo `Prefix` do `.prp` (padrão `sybase`). Substitua `sybase` abaixo se usar outro prefixo.
+
+| Ferramenta | Finalidade |
 |---|---|
-| `sybase_ping` | `SELECT 1` health check |
-| `sybase_database_info` | Product, version, charset, collation, current user, server runtime settings |
-| `sybase_list_schemas` | Distinct schemas/owners with object count |
-| `sybase_get_tables` | List tables / views with `pattern`, `type`, `limit`, `offset`, `format` |
-| `sybase_get_columns` | Column definitions of a table (name, type, length, scale, default, nullable, remarks) |
-| `sybase_get_table_info` | One-shot JSON: identity + columns + PK + FKs + indexes + estimated rows |
-| `sybase_get_primary_keys` | PK columns of a table, in key order |
-| `sybase_get_foreign_keys` | Outgoing and/or incoming FKs of a table |
-| `sybase_get_indexes` | Indexes of a table with unique flag and column ordering |
-| `sybase_get_table_permissions` | Table-level privileges granted to users/groups |
-| `sybase_get_procedures` | List stored procedures and functions (with type) |
-| `sybase_get_procedure_definition` | Source code (CREATE body) of a procedure/function |
-| `sybase_get_view_definition` | SELECT body of a view |
-| `sybase_search_objects` | LIKE search across tables/views/procedures/functions/columns |
-| `sybase_sample_rows` | TOP N rows of a table, optionally random |
-| `sybase_count_rows` | COUNT(*) with optional WHERE |
-| `sybase_get_column_stats` | Profile: total rows, null count, distinct count, min/max |
-| `sybase_get_value_distribution` | Top N most frequent values of a column with frequency and percent |
-| `sybase_describe_query` | Describe a SELECT (columns, types) without executing it (via `sa_describe_query`) |
-| `sybase_explain_plan` | SQL Anywhere execution plan (text or XML), with automatic engine fallback |
-| `sybase_run_scalar` | Run a SELECT and return only the first column of the first row |
-| `sybase_run_query` | Ad-hoc SELECT (read-only mode rejects DML/DDL). Optional `params` for `?` placeholders. |
-| `sybase_execute` | INSERT/UPDATE/DELETE/DDL. Only registered when `AllowWrite=true`, requires `confirm=true` per call. Optional `params`. |
+| `sybase_ping` | Health check (`SELECT 1`) |
+| `sybase_database_info` | Produto, versão, charset, collation, usuário atual, parâmetros de runtime |
+| `sybase_list_schemas` | Schemas/owners distintos com contagem de objetos |
+| `sybase_get_tables` | Tabelas/views com `pattern`, `type`, `limit`, `offset`, `format` |
+| `sybase_get_columns` | Colunas (nome, tipo, tamanho, escala, default, nullable, remarks) |
+| `sybase_get_table_info` | JSON único: identidade + colunas + PK + FKs + índices + linhas estimadas |
+| `sybase_get_primary_keys` | Colunas da PK em ordem |
+| `sybase_get_foreign_keys` | FKs de saída e/ou entrada |
+| `sybase_get_indexes` | Índices com flag unique e ordem das colunas |
+| `sybase_get_table_permissions` | Privilégios por grantee (select/insert/update/delete/…) |
+| `sybase_get_procedures` | Procedures e functions (tipo inferido em SA 17) |
+| `sybase_get_procedure_definition` | Código-fonte (corpo CREATE) |
+| `sybase_get_view_definition` | Corpo SELECT da view |
+| `sybase_search_objects` | Busca LIKE em tabelas/views/procedures/functions/colunas |
+| `sybase_sample_rows` | TOP N da tabela, opcionalmente aleatório |
+| `sybase_count_rows` | `COUNT(*)` com `WHERE` opcional |
+| `sybase_get_column_stats` | Perfil: total, nulos, distintos, min/max |
+| `sybase_get_value_distribution` | Top N valores mais frequentes com contagem e percentual |
+| `sybase_describe_query` | Descreve um SELECT sem executar (`sa_describe_query`) |
+| `sybase_explain_plan` | Plano de execução (texto ou XML), com fallback automático de engine |
+| `sybase_run_scalar` | Primeira coluna da primeira linha de um SELECT |
+| `sybase_run_query` | SELECT ad hoc (rejeita DML/DDL em read-only). `params` opcional para `?`. |
+| `sybase_execute` | INSERT/UPDATE/DELETE/DDL. Só com `AllowWrite=true` + `confirm=true` por chamada. `params` opcional. |
 
-Every tabular tool accepts a `format` argument (`csv` / `json` / `markdown`) and
-returns a `// meta: {...}` envelope as the first line with `rowCount`,
-`elapsedMs`, `truncated`, column types and an optional `warning`.
+Toda ferramenta tabular aceita `format` (`csv` / `json` / `markdown`) e retorna na primeira linha o envelope `// meta: {...}` com `rowCount`, `elapsedMs`, `truncated`, tipos e `warning` opcional.
 
-### Recommended discovery flow for agents
+### Fluxo recomendado para agentes
 
-1. `sybase_database_info` once to learn what server you're on, then
-   `sybase_list_schemas` to know where to look.
-2. `sybase_search_objects` or `sybase_get_tables` with `pattern=` to find the
-   relevant objects.
-3. `sybase_get_table_info` on a candidate table - gives columns, keys and FKs
-   in a single document so the model can plan joins.
-4. `sybase_sample_rows` for a few example rows, and `sybase_get_value_distribution`
-   on key columns to understand cardinality and enumerated values.
-5. `sybase_describe_query` to validate a query and discover its shape **without
-   executing it**.
-6. `sybase_run_query` (with `params` for parameterized queries) for the actual
-   analytic query, with `format=json` if you want typed values, or
-   `format=markdown` for human-friendly answers.
-7. `sybase_explain_plan` if you want the model to suggest an index or rewrite.
+1. `sybase_database_info` — contexto do servidor; depois `sybase_list_schemas` para saber onde buscar.
+2. `sybase_search_objects` ou `sybase_get_tables` com `pattern=` para localizar objetos.
+3. `sybase_get_table_info` na tabela candidata — colunas, chaves e FKs em um único JSON para planejar JOINs.
+4. `sybase_sample_rows` para exemplos; `sybase_get_value_distribution` em colunas-chave para cardinalidade e valores enumerados.
+5. `sybase_describe_query` para validar forma/tipos **sem executar** o SELECT.
+6. `sybase_run_query` (com `params` quando houver filtros) — use `format=json` para valores tipados ou `format=markdown` para respostas legíveis.
+7. `sybase_explain_plan` se precisar sugerir índice ou reescrita de query.
 
-## Testing
+## Testes
 
-The repository ships with a Java test harness (`io.github.eduardo.sybasemcp.cli.TestAllTools`)
-that exercises every tool against a live database, auto-discovers a real schema
-/ table / column to use, and prints a PASS/FAIL/SKIP summary.
+O repositório inclui o harness Java `io.github.eduardo.sybasemcp.cli.TestAllTools`, que carrega o `.prp`, instancia cada ferramenta, descobre schema/tabela/coluna reais no banco e imprime resumo PASS/FAIL/SKIP.
 
 ```bash
-java -cp target/sybase-mcp-server-jar-with-dependencies.jar \
+java -cp target/sybase-mcp-server-jar-with-dependencies.jar ^
      io.github.eduardo.sybasemcp.cli.TestAllTools sqlanywhere.prp
 ```
 
-Exits non-zero on any failure. Useful as a smoke test after upgrading the
-driver, switching databases, or modifying tool code.
+No Linux/macOS, troque `^` por `\` na continuação da linha.
 
-## Configuration options
+Encerra com código diferente de zero se alguma ferramenta falhar. Útil após trocar driver, mudar de base ou alterar código das tools.
 
-All keys live in the `.prp` file (a standard Java properties file).
+## Opções de configuração
 
-| Key | Required | Default | Purpose |
+Todas as chaves ficam no `.prp` (arquivo de propriedades Java). Exemplo comentado: [sqlanywhere.prp.example](./sqlanywhere.prp.example).
+
+| Chave | Obrigatório | Padrão | Finalidade |
 |---|:---:|---|---|
-| `Prefix` | yes | - | Prefix for tool names (`<prefix>_get_tables`...) |
-| `DriverPath` | yes | - | Filesystem path to the JDBC driver `.jar` |
-| `DriverClass` | yes | - | Fully qualified class name of the JDBC driver |
-| `JdbcUrl` | yes | - | JDBC URL of the database |
-| `User` | no | - | Username (preferred over embedding in `JdbcUrl`) |
-| `Password` | no | - | Password (masked in logs) |
-| `ReadOnly` | no | `true` | When true, `run_query` only accepts SELECT/WITH/EXPLAIN/DESCRIBE |
-| `AllowWrite` | no | `false` | When true, registers the `<prefix>_execute` tool for DML/DDL |
-| `MaxRows` | no | `1000` | Server-wide cap on rows returned by any tool |
-| `QueryTimeoutSeconds` | no | `30` | Server-wide query timeout |
-| `DefaultFormat` | no | `csv` | Default output for tabular tools (`csv`, `json`, `markdown`) |
-| `AllowSchemas` | no | (all) | Comma-separated allow-list (case-insensitive) |
-| `BlockSchemas` | no | `SYS,DBO,RS_SYSTABGROUP,PUBLIC` | Comma-separated deny-list (case-insensitive) |
-| `Tables` | no | - | Comma-separated tables to expose as MCP resources |
-| `LogFile` | no | (stderr) | Path of the log file |
+| `Prefix` | sim | — | Prefixo dos nomes das tools (`<prefix>_get_tables`…) |
+| `DriverPath` | sim | — | Caminho do `.jar` do driver JDBC |
+| `DriverClass` | sim | — | Nome qualificado da classe do driver |
+| `JdbcUrl` | sim | — | URL JDBC do banco |
+| `User` | não | — | Usuário (preferível a embutir na URL) |
+| `Password` | não | — | Senha (mascarada nos logs) |
+| `ReadOnly` | não | `true` | Se `true`, `run_query` só aceita SELECT/WITH/EXPLAIN/DESCRIBE |
+| `AllowWrite` | não | `false` | Se `true`, registra `<prefix>_execute` para DML/DDL |
+| `MaxRows` | não | `1000` | Teto de linhas retornadas por qualquer tool |
+| `QueryTimeoutSeconds` | não | `30` | Timeout de query no servidor |
+| `DefaultFormat` | não | `csv` | Formato padrão (`csv`, `json`, `markdown`) |
+| `AllowSchemas` | não | (todos) | Lista allow (separada por vírgula, case-insensitive) |
+| `BlockSchemas` | não | `SYS,DBO,RS_SYSTABGROUP,PUBLIC` | Lista deny (separada por vírgula) |
+| `Tables` | não | — | Tabelas expostas como recursos MCP (opcional) |
+| `LogFile` | não | (stderr) | Arquivo de log |
 
-## Driver notes
+## Notas sobre drivers
 
-### Native driver (`sajdbc4`) on Windows
+### Driver nativo (`sajdbc4`) no Windows
 
-The native driver loads `dbjdbc16.dll` from `<SQL Anywhere 16>\Bin64`. The SQL
-Anywhere installer normally adds that folder to `PATH`, so it just works. If
-you see `UnsatisfiedLinkError`, either:
+O driver nativo carrega `dbjdbc16.dll` de `<SQL Anywhere 16>\Bin64`. O instalador SAP costuma colocar essa pasta no `PATH`. Se aparecer `UnsatisfiedLinkError`:
 
-- add `<SQL Anywhere 16>\Bin64` to `PATH`, or
-- prepend `-Djava.library.path="C:\\Program Files\\SQL Anywhere 16\\Bin64"` to
-  the `java` command in your `mcp.json`.
+- adicione `<SQL Anywhere 16>\Bin64` ao `PATH`, ou
+- inclua `-Djava.library.path="C:\\Program Files\\SQL Anywhere 16\\Bin64"` no comando `java` do `mcp.json`.
 
-The native driver supports unqualified table names; you do **not** need the
-TDS-only "always qualify with the owner" rule of jConnect.
+O driver nativo aceita nomes de tabela sem qualificação; **não** é necessária a regra TDS do jConnect de sempre usar `owner.tabela`.
+
+**SQL Anywhere 17:** consultas de catálogo foram ajustadas para colunas inexistentes em SA 17 (por exemplo `SYS.SYSPROCEDURE.proc_type`, `SYS.SYSFKEY.role`); tipos de rotina e nomes de FK usam alternativas documentadas no [CHANGELOG.md](./CHANGELOG.md).
 
 ### jConnect (`jconn4.jar`)
 
-Pure Java, works anywhere. With jConnect you communicate via the TDS protocol
-which requires:
+Java puro, funciona em qualquer SO. Com jConnect (protocolo TDS):
 
-- **Always** qualify table names with their owner: `SELECT * FROM owner.tbl`.
-- Do **not** use double-quoted identifiers (`"tbl"`).
+- **Sempre** qualifique tabelas com o owner: `SELECT * FROM owner.tbl`;
+- **Não** use identificadores entre aspas duplas (`"tbl"`).
 
-Use the `_get_tables` tool first to find the correct owner (the `Schema`
-column).
+Use `_get_tables` primeiro para descobrir o owner correto (coluna `Schema`).
 
-## Security model
+## Modelo de segurança
 
-- **Read-only by default.** The default `ReadOnly=true` means the server only
-  accepts SELECT-class statements through `run_query`. To run anything else,
-  set `AllowWrite=true` in the `.prp` AND call `<prefix>_execute` with
-  `confirm=true` per statement.
-- **Allow/block schemas.** Out of the box, the agent cannot see `SYS`, `DBO`,
-  `RS_SYSTABGROUP` or `PUBLIC`. Override with `BlockSchemas=` or restrict to
-  specific schemas with `AllowSchemas=`.
-- **No stacked statements.** `run_query` and `execute` reject payloads with
-  more than one statement.
-- **Caps.** Every tool obeys `MaxRows` and `QueryTimeoutSeconds`; per-call
-  parameters may *lower* but never raise them.
-- **Logs masked.** `Password`, `PWD` and `passwd` values are stripped from
-  log lines and from JDBC exceptions before they're emitted.
-- **Prepared statements.** All metadata queries use bound parameters. Tools
-  that build SQL from identifiers (sample/count) require those identifiers to
-  match `[A-Za-z_][A-Za-z0-9_$#]*` before they're interpolated.
+- **Somente leitura por padrão.** Com `ReadOnly=true` (padrão), `run_query` só aceita statements do tipo SELECT. Para DML/DDL, defina `AllowWrite=true` no `.prp` **e** chame `<prefix>_execute` com `confirm=true` em cada statement.
+- **Allow/block de schemas.** Por padrão o agente não enxerga `SYS`, `DBO`, `RS_SYSTABGROUP` nem `PUBLIC`. Ajuste com `BlockSchemas=` ou restrinja com `AllowSchemas=`.
+- **Sem statements empilhados.** `run_query` e `execute` rejeitam payloads com mais de um statement.
+- **Limites.** Todas as tools respeitam `MaxRows` e `QueryTimeoutSeconds`; parâmetros por chamada podem **reduzir**, nunca aumentar, o teto do servidor.
+- **Logs mascarados.** Valores de `Password`, `PWD` e `passwd` são removidos de logs e exceções JDBC antes de serem emitidos.
+- **Prepared statements.** Metadados usam parâmetros vinculados. Tools que montam SQL a partir de identificadores (`sample_rows`, `count_rows`, etc.) exigem padrão `[A-Za-z_][A-Za-z0-9_$#]*` antes de interpolar.
 
-## License
+## Upstream e contribuição
 
-MIT - see [LICENSE](./LICENSE).
+| Repositório | Papel |
+|---|---|
+| [edurbs/sybase-sqlanywhere-mcp](https://github.com/edurbs/sybase-sqlanywhere-mcp) | Projeto original |
+| [anderson-prfilho/sybase-sqlanywhere-mcp](https://github.com/anderson-prfilho/sybase-sqlanywhere-mcp) | Fork com expansão v2.x (este repositório) |
+
+Para sincronizar com o upstream:
+
+```bash
+git fetch upstream
+git merge upstream/main
+```
+
+## Licença
+
+MIT — veja [LICENSE](./LICENSE).
